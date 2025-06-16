@@ -23,3 +23,12 @@ def calculate_atr_stop_loss_take_profit(symbol, atr_multiplier=1.5):
     take_profit = current_price + (atr * atr_multiplier)
 
     return round(stop_loss, 6), round(take_profit, 6)
+
+
+def calculate_trailing_stop(entry_price, current_price, trailing_percentage=0.02):
+    """Harekete duyarlı zarar kes fiyatı hesaplar."""
+    base_stop = entry_price * (1 - trailing_percentage)
+    if current_price > entry_price:
+        new_stop = current_price * (1 - trailing_percentage)
+        base_stop = max(base_stop, new_stop)
+    return round(base_stop, 6)

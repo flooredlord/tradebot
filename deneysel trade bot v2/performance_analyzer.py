@@ -1,6 +1,8 @@
 import json
 from datetime import datetime
 from collections import defaultdict
+import config
+from telegram_notifier import send_telegram_message
 
 def analyze_performance():
     try:
@@ -57,3 +59,6 @@ def analyze_performance():
 
     with open("performance_report.txt", "w", encoding="utf-8") as f:
         f.write(report)
+
+    if config.TELEGRAM_ENABLED:
+        send_telegram_message(report)
