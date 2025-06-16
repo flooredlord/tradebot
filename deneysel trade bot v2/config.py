@@ -1,5 +1,16 @@
-BINANCE_API_KEY = 'PNVYm40GR79ElQsZ886rC6wpdhEDRloqJ5qUOP0jr0sNdTUwiBWiHt0jAlw8vGmE'
-BINANCE_API_SECRET = 'yN8Z2Kdp0yfnL5hcP8Tj1DvTMAFbXc1E1kNcAVOs50EtG81oiI8iOz4Eg1UeL03K'
+import os
+
+
+def _get_env(name: str, default: str | None = None) -> str:
+    """Return environment variable value or raise if it is missing."""
+    value = os.environ.get(name, default)
+    if value is None:
+        raise EnvironmentError(f"Environment variable '{name}' is required")
+    return value
+
+
+BINANCE_API_KEY = _get_env("BINANCE_API_KEY")
+BINANCE_API_SECRET = _get_env("BINANCE_API_SECRET")
 
 BASE_CURRENCY = 'USDT'
 TRADE_SYMBOLS = []  # boş bırak, top 50 otomatik yüklenecek
@@ -14,8 +25,8 @@ TIMEFRAMES = ['1h', '4h']
 EXCLUDED_SYMBOLS = ['BNBUSDT', 'USDCUSDT']
 
 TELEGRAM_ENABLED = True
-TELEGRAM_TOKEN = '7825739294:AAEYnSVBKsDxjsLvLgLquYnTHW8Z5Jv0bZU'
-TELEGRAM_CHAT_ID = '418989376'
+TELEGRAM_TOKEN = _get_env("TELEGRAM_TOKEN")
+TELEGRAM_CHAT_ID = _get_env("TELEGRAM_CHAT_ID")
 
 # Teknik indikatör kontrolleri
 USE_RSI = True
