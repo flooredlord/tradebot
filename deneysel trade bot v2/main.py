@@ -4,7 +4,6 @@ import config
 from utils import get_balance, place_order, adjust_quantity_to_lot_size, adjust_notional_to_min, log
 from coin_utils import get_top_symbols
 from strategies import generate_signal
-from risk_management import calculate_atr_stop_loss_take_profit
 from telegram_notifier import send_telegram_message
 from utils import client
 from position_manager import load_positions, save_positions
@@ -38,7 +37,6 @@ def main():
 
     while True:
         usdt_balance = get_balance(config.BASE_CURRENCY)
-        min_trade = config.MIN_TRADE_AMOUNT
         scores = []
 
         for symbol in symbols:
