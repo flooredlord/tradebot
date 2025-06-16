@@ -16,6 +16,8 @@ TAKE_PROFIT_PERCENTAGE = 0.02  # %2 kâr al
 
 # Kâr koruma için iz süren zarar kes oranı
 TRAILING_STOP_PERCENTAGE = 0.03  # %3 geriden takip eden zarar kes
+FEE_RATE = 0.001  # %0.1
+
 
 TIMEFRAMES = ['1h', '4h']
 EXCLUDED_SYMBOLS = ['BNBUSDT', 'USDCUSDT']
