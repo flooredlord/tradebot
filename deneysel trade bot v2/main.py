@@ -77,7 +77,10 @@ def main():
                 profit_ratio = (current_price - buy_price) / buy_price
 
             if signal == "SELL" and position == "LONG":
-                order = place_order(symbol, "SELL", held_qty)
+                sl, tp = calculate_atr_stop_loss_take_profit(symbol)
+                log(f"{symbol} stop_loss: {sl}, take_profit: {tp}")
+                send_telegram_message(f"{symbol} SL: {sl}, TP: {tp}")
+                order = place_order(symbol, "SELL", held_qty, stop_loss=sl, take_profit=tp)
                 positions[symbol] = "SHORT"
                 save_positions(positions)
                 log(f"🔴 SELL signal: {symbol} tüm pozisyon satıldı")
@@ -92,14 +95,20 @@ def main():
 
                 if sell_qty > 0:
                     sell_qty = adjust_quantity_to_lot_size(symbol, sell_qty)
-                    order = place_order(symbol, "SELL", sell_qty)
+                    sl, tp = calculate_atr_stop_loss_take_profit(symbol)
+                    log(f"{symbol} stop_loss: {sl}, take_profit: {tp}")
+                    send_telegram_message(f"{symbol} SL: {sl}, TP: {tp}")
+                    order = place_order(symbol, "SELL", sell_qty, stop_loss=sl, take_profit=tp)
                     positions[symbol] = "LONG"
                     save_positions(positions)
                     log(f"🟡 Kârda kademeli satış: {symbol} %{profit_ratio*100:.1f} kârla {sell_qty} adet")
                     send_telegram_message(f"Kâr satışı: {symbol} at {current_price}, qty: {sell_qty}")
 
             elif signal == "BUY" and position != "LONG":
-                order = place_order(symbol, "BUY", quantity)
+                sl, tp = calculate_atr_stop_loss_take_profit(symbol)
+                log(f"{symbol} stop_loss: {sl}, take_profit: {tp}")
+                send_telegram_message(f"{symbol} SL: {sl}, TP: {tp}")
+                order = place_order(symbol, "BUY", quantity, stop_loss=sl, take_profit=tp)
                 positions[symbol] = "LONG"
                 save_positions(positions)
                 log(f"🟢 BUY order: {symbol} at {current_price}, qty: {quantity}")
