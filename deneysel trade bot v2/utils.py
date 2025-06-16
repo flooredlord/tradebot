@@ -3,11 +3,29 @@ from binance.exceptions import BinanceAPIException
 import os
 import json
 import math
+import logging
+from logging.handlers import RotatingFileHandler
 import config
 from datetime import datetime
 
 
 client = Client(config.BINANCE_API_KEY, config.BINANCE_API_SECRET)
+
+# Configure application logger
+logger = logging.getLogger("tradebot")
+logger.setLevel(logging.INFO)
+
+file_handler = RotatingFileHandler(
+    "trade_log.txt", maxBytes=1_000_000, backupCount=5, encoding="utf-8"
+)
+console_handler = logging.StreamHandler()
+
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+file_handler.setFormatter(formatter)
+console_handler.setFormatter(formatter)
+
+logger.addHandler(file_handler)
+logger.addHandler(console_handler)
 
 def get_symbol_info(symbol):
     return client.get_symbol_info(symbol)
@@ -75,19 +93,6 @@ def place_order(symbol, side, quantity):
         print(f"Binance API error: {e}")
         return None
 
-def log(message):
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-    if 'BUY order' in message:
-        emoji = '🟢'
-    elif 'SELL order' in message:
-        emoji = '🔴'
-    elif 'HOLD' in message:
-        emoji = '⚪'
-    else:
-        emoji = '📝'
-
-    line = f"{emoji} [{timestamp}] {message}"
-    with open('trade_log.txt', 'a', encoding='utf-8') as f:
-        f.write(line + '\\n')
-    print(line)
+def log(message, level=logging.INFO):
+    """Log a message using the configured logger."""
+    logger.log(level, message)
