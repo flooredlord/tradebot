@@ -4,7 +4,7 @@ import config
 from utils import get_balance, place_order, adjust_quantity_to_lot_size, adjust_notional_to_min, log
 from coin_utils import get_top_symbols
 from strategies import generate_signal
-from risk_management import calculate_atr_stop_loss_take_profit
+from risk_management import calculate_atr_stop_loss_take_profit, calculate_trailing_stop
 from telegram_notifier import send_telegram_message
 from utils import client
 from position_manager import load_positions, save_positions
@@ -35,6 +35,8 @@ def main():
     log(f"✅ Toplam {len(symbols)} coin yüklendi.")
     duration = (datetime.now() - start_time).total_seconds()
     log(f"⏱️ Başlangıç süresi: {duration:.2f} saniye")
+
+    highest_prices = {}
 
     while True:
         usdt_balance = get_balance(config.BASE_CURRENCY)
@@ -75,6 +77,24 @@ def main():
             profit_ratio = 0
             if buy_price:
                 profit_ratio = (current_price - buy_price) / buy_price
+
+            if position == "LONG":
+                prev_high = highest_prices.get(symbol, buy_price or current_price)
+                highest_prices[symbol] = max(prev_high, current_price)
+                trailing_stop = calculate_trailing_stop(
+                    buy_price or current_price,
+                    highest_prices[symbol],
+                    config.TRAILING_STOP_PERCENTAGE,
+                )
+                if current_price <= trailing_stop:
+                    order = place_order(symbol, "SELL", held_qty)
+                    positions[symbol] = "SHORT"
+                    save_positions(positions)
+                    log(f"🔴 Trailing stop tetiklendi: {symbol} {current_price}")
+                    send_telegram_message(
+                        f"Trailing stop: {symbol} at {current_price}, qty: {held_qty}"
+                    )
+                    continue
 
             if signal == "SELL" and position == "LONG":
                 order = place_order(symbol, "SELL", held_qty)
