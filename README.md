@@ -5,6 +5,9 @@ This repository contains a simple trading bot project.
 ## New Features
 
 The bot now provides helper modules for:
+* `features.py` – prepare machine-learning features from OHLCV data.
+* `ml_model.py` – train a RandomForest model and make predictions.
+* `daily_report.py` – create a daily PnL summary and optionally send it via Telegram.
 
 * `dashboard.py` – a Tkinter GUI displaying open positions and trade history.
 * `backtester.py` – run a basic historical backtest using Binance data.
