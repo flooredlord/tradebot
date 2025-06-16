@@ -6,6 +6,14 @@ PATCH_DIR = 'update'
 ARCHIVE_DIR = 'patched'
 
 def apply_patches():
+    """Apply Python patch files found in the ``update`` directory.
+
+    For each file matching ``patch_<target>.py`` the current version of
+    ``<target>.py`` is backed up with a ``.bak`` extension. The patch
+    then overwrites the original file. After a successful update the
+    patch file is moved into the ``patched`` directory with a
+    timestamped name for archival.
+    """
     if not os.path.exists(PATCH_DIR):
         print("🟡 No update folder found.")
         return
