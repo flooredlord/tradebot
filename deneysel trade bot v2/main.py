@@ -18,7 +18,10 @@ def load_trade_history():
     try:
         with open("trade_history.json", "r", encoding="utf-8") as f:
             return json.load(f)
-    except:
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+    except Exception as e:
+        log(f"Unexpected error loading trade history: {e}")
         return []
 
 def get_last_buy_price(symbol, history):
