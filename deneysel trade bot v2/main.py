@@ -9,10 +9,7 @@ from telegram_notifier import send_telegram_message
 from utils import client
 from position_manager import load_positions, save_positions
 from performance_analyzer import analyze_performance
-from update_loader import apply_patches
 import json
-
-apply_patches()
 
 def load_trade_history():
     try:
