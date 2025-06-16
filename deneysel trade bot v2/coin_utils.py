@@ -1,8 +1,6 @@
 import config
 from utils import client
 
-import config
-from utils import client
 
 def get_top_symbols(base_currency='USDT', top_n=50):
     exchange_info = client.get_exchange_info()
