@@ -5,6 +5,10 @@ def send_telegram_message(message):
     if not config.TELEGRAM_ENABLED:
         return
 
+    if not config.TELEGRAM_TOKEN or not config.TELEGRAM_CHAT_ID:
+        print("Telegram credentials not set. Skipping notification.")
+        return
+
     url = f"https://api.telegram.org/bot{config.TELEGRAM_TOKEN}/sendMessage"
     data = {
         "chat_id": config.TELEGRAM_CHAT_ID,

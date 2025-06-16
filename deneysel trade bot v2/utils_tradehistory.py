@@ -25,6 +25,11 @@ import config
 import json
 from datetime import datetime
 
+if not config.BINANCE_API_KEY or not config.BINANCE_API_SECRET:
+    raise ValueError(
+        "Binance API credentials are missing. Set BINANCE_API_KEY and BINANCE_API_SECRET environment variables."
+    )
+
 client = Client(config.BINANCE_API_KEY, config.BINANCE_API_SECRET)
 
 def get_symbol_info(symbol):
