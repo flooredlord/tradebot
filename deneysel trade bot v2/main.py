@@ -1,7 +1,13 @@
 from datetime import datetime
 import time
 import config
-from utils import get_balance, place_order, adjust_quantity_to_lot_size, adjust_notional_to_min, log
+from utils import (
+    get_balance,
+    place_order,
+    adjust_quantity_to_lot_size,
+    adjust_notional_to_min,
+    logger,
+)
 from coin_utils import get_top_symbols
 from strategies import generate_signal
 from risk_management import calculate_atr_stop_loss_take_profit, calculate_trailing_stop
@@ -32,12 +38,12 @@ def get_last_buy_price(symbol, history):
 
 def main():
     start_time = datetime.now()
-    log("🚀 Bot başlatılıyor... Coin listesi hazırlanıyor...")
+    logger.info("🚀 Bot başlatılıyor... Coin listesi hazırlanıyor...")
     positions = load_positions()
     symbols = get_top_symbols(base_currency=config.BASE_CURRENCY)
-    log(f"✅ Toplam {len(symbols)} coin yüklendi.")
+    logger.info(f"✅ Toplam {len(symbols)} coin yüklendi.")
     duration = (datetime.now() - start_time).total_seconds()
-    log(f"⏱️ Başlangıç süresi: {duration:.2f} saniye")
+    logger.info(f"⏱️ Başlangıç süresi: {duration:.2f} saniye")
 
     highest_prices = {}
 
@@ -52,7 +58,7 @@ def main():
                 scores.append((symbol, score))
 
         if not scores:
-            log("⚪ Sinyal gelen coin yok.")
+            logger.info("⚪ Sinyal gelen coin yok.")
             time.sleep(config.CHECK_INTERVAL)
             continue
 
@@ -70,7 +76,7 @@ def main():
             quantity = adjust_notional_to_min(symbol, quantity, current_price)
             notional = current_price * quantity
             if notional < config.MIN_TRADE_AMOUNT:
-                log(f"⚠️ {symbol} için {notional:.2f} USDT altında işlem oluştu, atlandı.")
+                logger.info(f"⚠️ {symbol} için {notional:.2f} USDT altında işlem oluştu, atlandı.")
                 continue
 
             position = positions.get(symbol, "NONE")
@@ -103,7 +109,7 @@ def main():
                 order = place_order(symbol, "SELL", held_qty)
                 positions[symbol] = "SHORT"
                 save_positions(positions)
-                log(f"🔴 SELL signal: {symbol} tüm pozisyon satıldı")
+                logger.info(f"🔴 SELL signal: {symbol} tüm pozisyon satıldı")
                 send_telegram_message(f"SELL signal: {symbol} at {current_price}, qty: {held_qty}")
 
             elif signal == "HOLD" and position == "LONG" and profit_ratio > 0.10:
@@ -118,18 +124,18 @@ def main():
                     order = place_order(symbol, "SELL", sell_qty)
                     positions[symbol] = "LONG"
                     save_positions(positions)
-                    log(f"🟡 Kârda kademeli satış: {symbol} %{profit_ratio*100:.1f} kârla {sell_qty} adet")
+                    logger.info(f"🟡 Kârda kademeli satış: {symbol} %{profit_ratio*100:.1f} kârla {sell_qty} adet")
                     send_telegram_message(f"Kâr satışı: {symbol} at {current_price}, qty: {sell_qty}")
 
             elif signal == "BUY" and position != "LONG":
                 order = place_order(symbol, "BUY", quantity)
                 positions[symbol] = "LONG"
                 save_positions(positions)
-                log(f"🟢 BUY order: {symbol} at {current_price}, qty: {quantity}")
+                logger.info(f"🟢 BUY order: {symbol} at {current_price}, qty: {quantity}")
                 send_telegram_message(f"BUY order: {symbol} at {current_price}, qty: {quantity}")
 
             else:
-                log(f"⚪ HOLD: {symbol}")
+                logger.info(f"⚪ HOLD: {symbol}")
 
         analyze_performance()
         time.sleep(config.CHECK_INTERVAL)
