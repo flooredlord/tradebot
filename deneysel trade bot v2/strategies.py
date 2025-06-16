@@ -1,10 +1,22 @@
 import pandas as pd
 import ta
-from utils import client
+import asyncio
+from utils import client, async_get_klines
 import config
 
 def fetch_klines(symbol, interval, limit=100):
     klines = client.get_klines(symbol=symbol, interval=interval, limit=limit)
+    df = pd.DataFrame(klines, columns=[
+        'timestamp', 'open', 'high', 'low', 'close', 'volume',
+        'close_time', 'quote_asset_volume', 'number_of_trades',
+        'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'
+    ])
+    df['close'] = df['close'].astype(float)
+    df['volume'] = df['volume'].astype(float)
+    return df
+
+async def fetch_klines_async(symbol, interval, limit=100):
+    klines = await async_get_klines(symbol, interval, limit)
     df = pd.DataFrame(klines, columns=[
         'timestamp', 'open', 'high', 'low', 'close', 'volume',
         'close_time', 'quote_asset_volume', 'number_of_trades',
@@ -31,13 +43,13 @@ def apply_indicators(df):
     df['volume_ma'] = df['volume'].rolling(window=20).mean()
     return df
 
-def generate_signal(symbol, timeframes, return_score=False):
+async def generate_signal(symbol, timeframes, return_score=False):
     buy_signals = []
     sell_signals = []
     total_score = 0
 
     for tf in timeframes:
-        df = fetch_klines(symbol, tf)
+        df = await fetch_klines_async(symbol, tf)
         df = apply_indicators(df)
         latest = df.iloc[-1]
 

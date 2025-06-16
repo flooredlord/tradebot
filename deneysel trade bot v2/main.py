@@ -1,7 +1,14 @@
 from datetime import datetime
-import time
+import asyncio
 import config
-from utils import get_balance, place_order, adjust_quantity_to_lot_size, adjust_notional_to_min, log
+from utils import (
+    async_get_balance,
+    place_order,
+    async_get_symbol_ticker,
+    adjust_quantity_to_lot_size,
+    adjust_notional_to_min,
+    log,
+)
 from coin_utils import get_top_symbols
 from strategies import generate_signal
 from risk_management import calculate_atr_stop_loss_take_profit, calculate_trailing_stop
@@ -27,7 +34,7 @@ def get_last_buy_price(symbol, history):
             return float(entry["price"]), float(entry["quantity"])
     return None, None
 
-def main():
+async def main():
     start_time = datetime.now()
     log("🚀 Bot başlatılıyor... Coin listesi hazırlanıyor...")
     positions = load_positions()
@@ -39,28 +46,28 @@ def main():
     highest_prices = {}
 
     while True:
-        usdt_balance = get_balance(config.BASE_CURRENCY)
-        min_trade = config.MIN_TRADE_AMOUNT
-        scores = []
-
-        for symbol in symbols:
-            score = generate_signal(symbol, config.TIMEFRAMES, return_score=True)
-            if score > 0:
-                scores.append((symbol, score))
+        usdt_balance = await async_get_balance(config.BASE_CURRENCY)
+        scores_tasks = [generate_signal(symbol, config.TIMEFRAMES, return_score=True) for symbol in symbols]
+        score_values = await asyncio.gather(*scores_tasks)
+        scores = [(sym, sc) for sym, sc in zip(symbols, score_values) if sc > 0]
 
         if not scores:
             log("⚪ Sinyal gelen coin yok.")
-            time.sleep(config.CHECK_INTERVAL)
+            await asyncio.sleep(config.CHECK_INTERVAL)
             continue
 
         total_score = sum(score for _, score in scores)
         history = load_trade_history()
 
-        for symbol, score in scores:
-            weight = score / total_score
-            trade_amount = usdt_balance * weight
-            ticker = client.get_symbol_ticker(symbol=symbol)
+        price_tasks = [async_get_symbol_ticker(symbol=s) for s, _ in scores]
+        prices = await asyncio.gather(*price_tasks)
+
+        signal_tasks = [generate_signal(symbol, config.TIMEFRAMES) for symbol, _ in scores]
+        signals = await asyncio.gather(*signal_tasks)
+
+        for ((symbol, score), ticker, signal) in zip(scores, prices, signals):
             current_price = float(ticker["price"])
+            trade_amount = usdt_balance * (score / total_score)
             quantity = trade_amount / current_price
 
             quantity = adjust_quantity_to_lot_size(symbol, quantity)
@@ -71,7 +78,6 @@ def main():
                 continue
 
             position = positions.get(symbol, "NONE")
-            signal = generate_signal(symbol, config.TIMEFRAMES)
 
             buy_price, held_qty = get_last_buy_price(symbol, history)
             profit_ratio = 0
@@ -97,7 +103,7 @@ def main():
                     continue
 
             if signal == "SELL" and position == "LONG":
-                order = place_order(symbol, "SELL", held_qty)
+                await asyncio.to_thread(place_order, symbol, "SELL", held_qty)
                 positions[symbol] = "SHORT"
                 save_positions(positions)
                 log(f"🔴 SELL signal: {symbol} tüm pozisyon satıldı")
@@ -105,21 +111,21 @@ def main():
 
             elif signal == "HOLD" and position == "LONG" and profit_ratio > 0.10:
                 sell_qty = 0
-                if profit_ratio >= 0.10 and profit_ratio < 0.15:
+                if 0.10 <= profit_ratio < 0.15:
                     sell_qty = held_qty * 0.5
                 elif profit_ratio >= 0.15:
                     sell_qty = held_qty * 0.5
 
                 if sell_qty > 0:
                     sell_qty = adjust_quantity_to_lot_size(symbol, sell_qty)
-                    order = place_order(symbol, "SELL", sell_qty)
+                    await asyncio.to_thread(place_order, symbol, "SELL", sell_qty)
                     positions[symbol] = "LONG"
                     save_positions(positions)
                     log(f"🟡 Kârda kademeli satış: {symbol} %{profit_ratio*100:.1f} kârla {sell_qty} adet")
                     send_telegram_message(f"Kâr satışı: {symbol} at {current_price}, qty: {sell_qty}")
 
             elif signal == "BUY" and position != "LONG":
-                order = place_order(symbol, "BUY", quantity)
+                await asyncio.to_thread(place_order, symbol, "BUY", quantity)
                 positions[symbol] = "LONG"
                 save_positions(positions)
                 log(f"🟢 BUY order: {symbol} at {current_price}, qty: {quantity}")
@@ -129,9 +135,9 @@ def main():
                 log(f"⚪ HOLD: {symbol}")
 
         analyze_performance()
-        time.sleep(config.CHECK_INTERVAL)
+        await asyncio.sleep(config.CHECK_INTERVAL)
 
 if __name__ == "__main__":
     import multiprocessing
     multiprocessing.freeze_support()
-    main()
+    asyncio.run(main())

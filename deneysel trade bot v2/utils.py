@@ -1,5 +1,7 @@
 from binance.client import Client
 from binance.exceptions import BinanceAPIException
+from binance import AsyncClient
+import asyncio
 import os
 import json
 import math
@@ -8,6 +10,23 @@ from datetime import datetime
 
 
 client = Client(config.BINANCE_API_KEY, config.BINANCE_API_SECRET)
+async_client = None
+
+async def get_async_client():
+    global async_client
+    if async_client is None:
+        async_client = await AsyncClient.create(config.BINANCE_API_KEY, config.BINANCE_API_SECRET)
+    return async_client
+
+async def close_async_client():
+    global async_client
+    if async_client:
+        await async_client.close_connection()
+        async_client = None
+
+async def async_get_klines(symbol, interval, limit=100):
+    client = await get_async_client()
+    return await client.get_klines(symbol=symbol, interval=interval, limit=limit)
 
 def get_symbol_info(symbol):
     return client.get_symbol_info(symbol)
@@ -36,6 +55,11 @@ def adjust_notional_to_min(symbol, quantity, price):
 
 def get_balance(asset):
     balance = client.get_asset_balance(asset)
+    return float(balance['free'])
+
+async def async_get_balance(asset):
+    client = await get_async_client()
+    balance = await client.get_asset_balance(asset)
     return float(balance['free'])
 
 def save_trade_history(symbol, side, price, quantity):
@@ -69,6 +93,25 @@ def place_order(symbol, side, quantity):
             quantity=quantity
         )
         print(f"Order placed: {order}")
+        save_trade_history(symbol, side, float(order['fills'][0]['price']), float(order['executedQty']))
+        return order
+    except BinanceAPIException as e:
+        print(f"Binance API error: {e}")
+        return None
+
+async def async_get_symbol_ticker(symbol):
+    client = await get_async_client()
+    return await client.get_symbol_ticker(symbol=symbol)
+
+async def async_place_order(symbol, side, quantity):
+    try:
+        client = await get_async_client()
+        order = await client.create_order(
+            symbol=symbol,
+            side=side,
+            type='MARKET',
+            quantity=quantity
+        )
         save_trade_history(symbol, side, float(order['fills'][0]['price']), float(order['executedQty']))
         return order
     except BinanceAPIException as e:
