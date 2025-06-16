@@ -78,7 +78,8 @@ def save_trade_history(symbol, side, price, quantity):
     with open("trade_history.json", "w", encoding="utf-8") as f:
         json.dump(history, f, indent=2)
 
-def place_order(symbol, side, quantity):
+def place_order(symbol, side, quantity, stop_loss=None, take_profit=None):
+    """Place a market order and optionally set OCO take-profit and stop-loss."""
     try:
         order = client.create_order(
             symbol=symbol,
@@ -88,6 +89,23 @@ def place_order(symbol, side, quantity):
         )
         print(f"Order placed: {order}")
         save_trade_history(symbol, side, float(order['fills'][0]['price']), float(order['executedQty']))
+
+        if side == 'BUY' and stop_loss and take_profit:
+            try:
+                stop_limit_price = round(stop_loss * 0.995, 6)
+                oco = client.create_oco_order(
+                    symbol=symbol,
+                    side='SELL',
+                    quantity=quantity,
+                    price=str(take_profit),
+                    stopPrice=str(stop_loss),
+                    stopLimitPrice=str(stop_limit_price),
+                    stopLimitTimeInForce='GTC'
+                )
+                print(f"OCO order placed: {oco}")
+            except BinanceAPIException as e:
+                print(f"Binance OCO error: {e}")
+
         return order
     except BinanceAPIException as e:
         print(f"Binance API error: {e}")
