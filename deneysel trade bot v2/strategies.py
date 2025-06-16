@@ -85,3 +85,12 @@ def generate_signal(symbol, timeframes, return_score=False):
         return 'SELL'
     else:
         return 'HOLD'
+
+
+def score_coins(symbols, timeframes):
+    """Return a mapping of symbol to generated score."""
+    scores = {}
+    for sym in symbols:
+        score = generate_signal(sym, timeframes, return_score=True)
+        scores[sym] = score
+    return scores
