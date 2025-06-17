@@ -9,7 +9,7 @@ from utils import (
     logger,
 )
 from coin_utils import get_top_symbols
-from strategies import generate_signal
+from strategy_selector import generate_signal
 from risk_management import calculate_atr_stop_loss_take_profit, calculate_trailing_stop
 from telegram_notifier import send_telegram_message
 from utils import client
