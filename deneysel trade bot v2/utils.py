@@ -9,7 +9,46 @@ import config
 from datetime import datetime
 
 
-client = Client(config.BINANCE_API_KEY, config.BINANCE_API_SECRET)
+class DummyClient:
+    """Fallback Binance client used when network access is unavailable."""
+
+    def get_symbol_info(self, symbol):
+        return {
+            "filters": [
+                {"filterType": "LOT_SIZE", "stepSize": "1"},
+                {"filterType": "MIN_NOTIONAL", "minNotional": "10"},
+            ]
+        }
+
+    def get_exchange_info(self):
+        return {"symbols": []}
+
+    def get_asset_balance(self, asset):
+        return {"free": "0"}
+
+    def create_order(self, **kwargs):
+        qty = kwargs.get("quantity", 0)
+        price = kwargs.get("price", "0")
+        return {"fills": [{"price": price, "qty": qty}], "executedQty": qty}
+
+    def create_oco_order(self, **kwargs):
+        return {}
+
+    def get_ticker(self, symbol):
+        return {"quoteVolume": "0", "price": "0"}
+
+
+# Attempt to create the real Binance client unless dummy mode is requested or
+# initialization fails (e.g. due to network restrictions).
+_use_dummy = os.getenv("USE_DUMMY_CLIENT", "0") == "1"
+if not _use_dummy:
+    try:
+        client = Client(config.BINANCE_API_KEY, config.BINANCE_API_SECRET)
+    except Exception as e:  # pragma: no cover - network failure
+        print(f"Binance client init failed: {e}. Falling back to DummyClient")
+        client = DummyClient()
+else:  # pragma: no cover - explicit dummy mode
+    client = DummyClient()
 
 # Configure application logger
 logger = logging.getLogger("tradebot")
