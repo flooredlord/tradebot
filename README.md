@@ -34,3 +34,22 @@ pytest
 ```
 
 This command will discover and run all tests inside the `tests/` directory.
+
+## GUI Launcher
+
+A simple Tkinter utility `gui_launcher.py` allows you to enter common configuration
+parameters such as API keys and trade size before starting the bot. Run it with:
+
+```bash
+python gui_launcher.py
+```
+
+To build a standalone executable on Windows, install [PyInstaller](https://pyinstaller.org)
+and execute:
+
+```bash
+pyinstaller --onefile gui_launcher.py
+```
+
+The resulting binary will be placed in the `dist/` directory and can be run with a
+single click.
