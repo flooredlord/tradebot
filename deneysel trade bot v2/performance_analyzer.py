@@ -62,3 +62,5 @@ def analyze_performance():
 
     if config.TELEGRAM_ENABLED:
         send_telegram_message(report)
+
+    return report

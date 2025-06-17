@@ -14,6 +14,15 @@ The bot now provides helper modules for:
 * `position_manager.py` – keeps track of last exit times to allow re-entry checks.
 * `utils.py` – includes retry logic for orders, partial sell support, and daily trade limit checks.
 
+Additional helper modules include:
+* `bot_command_handler.py` – polling Telegram bot for `/status`, `/pnl`, `/pause` and `/resume` commands.
+* `regime_detector.py` – determine if the market is trending or ranging.
+* `walk_forward.py` – perform walk-forward validation of machine-learning models.
+* `paper_trade.py` – simulate trades without sending real orders.
+* `metrics_db.py` – store trade and PnL metrics in a SQLite database.
+* `healthcheck.py` – basic health monitor that can restart the bot.
+* `autotune.py` – run a small grid search to find the best ML hyperparameters.
+
 
 ## Running Tests
 
