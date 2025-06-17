@@ -16,6 +16,8 @@ from utils import client
 from position_manager import load_positions, save_positions
 from performance_analyzer import analyze_performance
 from update_loader import apply_patches
+from features import generate_features
+from ml_model import load_model, predict
 import json
 
 apply_patches()
@@ -65,6 +67,8 @@ def main():
         total_score = sum(score for _, score in scores)
         history = load_trade_history()
 
+        model = load_model()
+
         for symbol, score in scores:
             weight = score / total_score
             trade_amount = usdt_balance * weight
@@ -81,6 +85,17 @@ def main():
 
             position = positions.get(symbol, "NONE")
             signal = generate_signal(symbol, config.TIMEFRAMES)
+
+            # Use ML model prediction if available
+            ml_signal = 'HOLD'
+            try:
+                features = generate_features(symbol)
+                ml_signal = predict(features.tail(1), model).iloc[0]
+            except Exception as e:
+                logger.error(f"ML prediction failed for {symbol}: {e}")
+
+            if ml_signal != 'HOLD':
+                signal = ml_signal
 
             buy_price, held_qty = get_last_buy_price(symbol, history)
             profit_ratio = 0
