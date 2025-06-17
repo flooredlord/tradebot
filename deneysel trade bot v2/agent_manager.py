@@ -20,6 +20,8 @@ class AgentManager:
 
     def get_signals(self, symbols: List[str]) -> Dict[str, str]:
         results: Dict[str, str] = {}
+        if not symbols:
+            return results
         with ThreadPoolExecutor(max_workers=len(symbols)) as executor:
             future_to_symbol = {executor.submit(self._aggregate_signal, s): s for s in symbols}
             for future in future_to_symbol:
