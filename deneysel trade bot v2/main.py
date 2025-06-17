@@ -1,5 +1,7 @@
 from datetime import datetime
 import time
+import json
+
 import config
 from utils import (
     get_balance,
@@ -7,20 +9,24 @@ from utils import (
     adjust_quantity_to_lot_size,
     adjust_notional_to_min,
     logger,
+    log,
+    client,
 )
 from coin_utils import get_top_symbols
-from strategies import generate_signal
 from risk_management import calculate_atr_stop_loss_take_profit, calculate_trailing_stop
 from telegram_notifier import send_telegram_message
-from utils import client
 from position_manager import load_positions, save_positions
 from performance_analyzer import analyze_performance
 from update_loader import apply_patches
-from features import generate_features
-from ml_model import load_model, predict
-import json
+from performance_graphs import generate_performance_graphs
+from agent_manager import AgentManager
+from agent_ml import MLAgent
+from agent_swing import SwingAgent
+from agent_news import NewsAgent
+from sizing import calculate_position_size
 
 apply_patches()
+
 
 def load_trade_history():
     try:
@@ -32,11 +38,13 @@ def load_trade_history():
         log(f"Unexpected error loading trade history: {e}")
         return []
 
+
 def get_last_buy_price(symbol, history):
     for entry in reversed(history):
         if entry["symbol"] == symbol and entry["type"] == "BUY":
             return float(entry["price"]), float(entry["quantity"])
     return None, None
+
 
 def main():
     start_time = datetime.now()
@@ -47,34 +55,19 @@ def main():
     duration = (datetime.now() - start_time).total_seconds()
     logger.info(f"⏱️ Başlangıç süresi: {duration:.2f} saniye")
 
+    manager = AgentManager([SwingAgent(), MLAgent(), NewsAgent()])
     highest_prices = {}
 
     while True:
         usdt_balance = get_balance(config.BASE_CURRENCY)
-        min_trade = config.MIN_TRADE_AMOUNT
-        scores = []
-
-        for symbol in symbols:
-            score = generate_signal(symbol, config.TIMEFRAMES, return_score=True)
-            if score > 0:
-                scores.append((symbol, score))
-
-        if not scores:
-            logger.info("⚪ Sinyal gelen coin yok.")
-            time.sleep(config.CHECK_INTERVAL)
-            continue
-
-        total_score = sum(score for _, score in scores)
         history = load_trade_history()
+        signals = manager.get_signals(symbols)
 
-        model = load_model()
-
-        for symbol, score in scores:
-            weight = score / total_score
-            trade_amount = usdt_balance * weight
+        for symbol, signal in signals.items():
+            trade_amount = calculate_position_size(usdt_balance * config.TRADE_PERCENTAGE, symbol)
             ticker = client.get_symbol_ticker(symbol=symbol)
             current_price = float(ticker["price"])
-            quantity = trade_amount / current_price
+            quantity = trade_amount / current_price if current_price else 0
 
             quantity = adjust_quantity_to_lot_size(symbol, quantity)
             quantity = adjust_notional_to_min(symbol, quantity, current_price)
@@ -84,23 +77,8 @@ def main():
                 continue
 
             position = positions.get(symbol, "NONE")
-            signal = generate_signal(symbol, config.TIMEFRAMES)
-
-            # Use ML model prediction if available
-            ml_signal = 'HOLD'
-            try:
-                features = generate_features(symbol)
-                ml_signal = predict(features.tail(1), model).iloc[0]
-            except Exception as e:
-                logger.error(f"ML prediction failed for {symbol}: {e}")
-
-            if ml_signal != 'HOLD':
-                signal = ml_signal
-
             buy_price, held_qty = get_last_buy_price(symbol, history)
-            profit_ratio = 0
-            if buy_price:
-                profit_ratio = (current_price - buy_price) / buy_price
+            profit_ratio = (current_price - buy_price) / buy_price if buy_price else 0
 
             if position == "LONG":
                 prev_high = highest_prices.get(symbol, buy_price or current_price)
@@ -111,7 +89,7 @@ def main():
                     config.TRAILING_STOP_PERCENTAGE,
                 )
                 if current_price <= trailing_stop:
-                    order = place_order(symbol, "SELL", held_qty)
+                    place_order(symbol, "SELL", held_qty)
                     positions[symbol] = "SHORT"
                     save_positions(positions)
                     log(f"🔴 Trailing stop tetiklendi: {symbol} {current_price}")
@@ -124,7 +102,7 @@ def main():
                 sl, tp = calculate_atr_stop_loss_take_profit(symbol)
                 log(f"{symbol} stop_loss: {sl}, take_profit: {tp}")
                 send_telegram_message(f"{symbol} SL: {sl}, TP: {tp}")
-                order = place_order(symbol, "SELL", held_qty, stop_loss=sl, take_profit=tp)
+                place_order(symbol, "SELL", held_qty, stop_loss=sl, take_profit=tp)
                 positions[symbol] = "SHORT"
                 save_positions(positions)
                 logger.info(f"🔴 SELL signal: {symbol} tüm pozisyon satıldı")
@@ -132,7 +110,7 @@ def main():
 
             elif signal == "HOLD" and position == "LONG" and profit_ratio > 0.10:
                 sell_qty = 0
-                if profit_ratio >= 0.10 and profit_ratio < 0.15:
+                if 0.10 <= profit_ratio < 0.15:
                     sell_qty = held_qty * 0.5
                 elif profit_ratio >= 0.15:
                     sell_qty = held_qty * 0.5
@@ -142,7 +120,7 @@ def main():
                     sl, tp = calculate_atr_stop_loss_take_profit(symbol)
                     log(f"{symbol} stop_loss: {sl}, take_profit: {tp}")
                     send_telegram_message(f"{symbol} SL: {sl}, TP: {tp}")
-                    order = place_order(symbol, "SELL", sell_qty, stop_loss=sl, take_profit=tp)
+                    place_order(symbol, "SELL", sell_qty, stop_loss=sl, take_profit=tp)
                     positions[symbol] = "LONG"
                     save_positions(positions)
                     logger.info(f"🟡 Kârda kademeli satış: {symbol} %{profit_ratio*100:.1f} kârla {sell_qty} adet")
@@ -152,19 +130,21 @@ def main():
                 sl, tp = calculate_atr_stop_loss_take_profit(symbol)
                 log(f"{symbol} stop_loss: {sl}, take_profit: {tp}")
                 send_telegram_message(f"{symbol} SL: {sl}, TP: {tp}")
-                order = place_order(symbol, "BUY", quantity, stop_loss=sl, take_profit=tp)
+                place_order(symbol, "BUY", quantity, stop_loss=sl, take_profit=tp)
                 positions[symbol] = "LONG"
                 save_positions(positions)
                 logger.info(f"🟢 BUY order: {symbol} at {current_price}, qty: {quantity}")
                 send_telegram_message(f"BUY order: {symbol} at {current_price}, qty: {quantity}")
-
             else:
                 logger.info(f"⚪ HOLD: {symbol}")
 
         analyze_performance()
+        generate_performance_graphs()
         time.sleep(config.CHECK_INTERVAL)
+
 
 if __name__ == "__main__":
     import multiprocessing
+
     multiprocessing.freeze_support()
     main()
