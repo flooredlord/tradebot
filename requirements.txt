@@ -1,0 +1,9 @@
+# Python dependencies for TradeBot
+pandas
+numpy
+matplotlib
+scikit-learn
+joblib
+requests
+python-binance
+ta
